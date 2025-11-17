@@ -1,0 +1,328 @@
+
+
+import requests
+import json
+from tabulate import tabulate  # pip install tabulate
+
+BASE_URL = "http://localhost:5000"
+
+# ========== CLIENT CLASS ==========
+
+class HospitalClient:
+    def __init__(self, base_url=BASE_URL):
+        self.base_url = base_url
+    
+    def add_patient(self, name, condition, severity, priority, resources_needed, 
+                   waiting_time=0, resource_type="General"):
+        """Add a new patient"""
+        data = {
+            "name": name,
+            "condition": condition,
+            "severity": severity,
+            "priority": priority,
+            "resources_needed": resources_needed,
+            "waiting_time": waiting_time,
+            "resource_type": resource_type
+        }
+        response = requests.post(f"{self.base_url}/api/patients", json=data)
+        return response.json()
+    
+    def get_all_patients(self):
+        """Get all patients"""
+        response = requests.get(f"{self.base_url}/api/patients")
+        return response.json()
+    
+    def delete_patient(self, patient_id):
+        """Delete patient"""
+        response = requests.delete(f"{self.base_url}/api/patients/{patient_id}")
+        return response.json()
+    
+    def get_schedule(self):
+        """Get priority schedule"""
+        response = requests.get(f"{self.base_url}/api/schedule")
+        return response.json()
+    
+    def allocate_resources(self, capacity):
+        """Allocate resources using knapsack"""
+        data = {"capacity": capacity}
+        response = requests.post(f"{self.base_url}/api/allocate", json=data)
+        return response.json()
+    
+    def get_recommendations(self, capacity):
+        """Get treatment recommendations"""
+        data = {"capacity": capacity}
+        response = requests.post(f"{self.base_url}/api/recommendations", json=data)
+        return response.json()
+    
+    def get_statistics(self):
+        """Get system statistics"""
+        response = requests.get(f"{self.base_url}/api/statistics")
+        return response.json()
+    
+    def reset(self):
+        """Clear all data"""
+        response = requests.post(f"{self.base_url}/api/reset")
+        return response.json()
+
+# ========== TEST SCENARIOS ==========
+
+def scenario_1_four_emergency_cases():
+    """Test Case 1: 4 Emergency Patients"""
+    print("\n" + "="*80)
+    print("SCENARIO 1: 4 EMERGENCY PATIENTS")
+    print("="*80)
+    
+    client = HospitalClient()
+    client.reset()
+    
+    # Add 4 patients
+    patients_data = [
+        ("Rajesh Kumar", "Acute Myocardial Infarction", 10, 100, 8, 2, "Doctors"),
+        ("Vikram Singh", "Multi-trauma (Accident)", 8, 85, 6, 5, "Doctors"),
+        ("Priya Sharma", "Advanced Labor (Pregnancy)", 9, 90, 5, 15, "Beds"),
+        ("Meera Patel", "Kidney Failure (Dialysis)", 7, 70, 4, 45, "Medicines")
+    ]
+    
+    print("\n📋 ADDING PATIENTS...")
+    for name, condition, severity, priority, resources, waiting, rtype in patients_data:
+        result = client.add_patient(name, condition, severity, priority, resources, waiting, rtype)
+        if result['success']:
+            print(f"✓ {name} added")
+    
+    # Get all patients
+    print("\n👥 ALL PATIENTS:")
+    all_patients = client.get_all_patients()
+    table_data = []
+    for p in all_patients['patients']:
+        table_data.append([
+            p['id'],
+            p['name'],
+            p['condition'],
+            f"{p['severity']}/10",
+            f"{p['priority']}/100",
+            p['resources_needed'],
+            p['waiting_time']
+        ])
+    
+    headers = ["ID", "Name", "Condition", "Severity", "Priority", "Resources", "Wait(min)"]
+    print(tabulate(table_data, headers=headers, tablefmt="grid"))
+    
+    # Get schedule
+    print("\n⏱️  PRIORITY SCHEDULE:")
+    schedule = client.get_schedule()
+    table_data = []
+    for p in schedule['schedule']:
+        table_data.append([
+            p['treatment_order'],
+            p['name'],
+            f"{p['severity']}/10",
+            f"{p['priority']}/100",
+            f"{p['priority_score']:.2f}"
+        ])
+    
+    headers = ["Order", "Patient Name", "Severity", "Priority", "Score"]
+    print(tabulate(table_data, headers=headers, tablefmt="grid"))
+    
+    # Allocate resources
+    print("\n💼 RESOURCE ALLOCATION (Knapsack) - Capacity: 20 units")
+    allocation = client.allocate_resources(20)
+    
+    print(f"\n✅ ALLOCATED ({allocation['total_resources_used']}/{allocation['total_capacity']} units):")
+    table_data = []
+    for p in allocation['allocated_patients']:
+        table_data.append([p['name'], p['resources_needed'], p['priority']])
+    
+    if table_data:
+        headers = ["Patient", "Resources", "Priority"]
+        print(tabulate(table_data, headers=headers, tablefmt="grid"))
+    
+    print(f"\n⚠️  WAITLISTED ({len(allocation['waitlisted_patients'])} patients):")
+    table_data = []
+    for p in allocation['waitlisted_patients']:
+        table_data.append([p['name'], p['resources_needed'], p['priority']])
+    
+    if table_data:
+        print(tabulate(table_data, headers=["Patient", "Resources", "Priority"], tablefmt="grid"))
+    
+    print(f"\nEfficiency: {allocation['allocation_efficiency']}%")
+    print(f"Remaining capacity: {allocation['resources_remaining']} units")
+    
+    # Statistics
+    print("\n📊 STATISTICS:")
+    stats = client.get_statistics()
+    print(f"Total Patients: {stats['total_patients']}")
+    print(f"Average Severity: {stats['average_severity']}")
+    print(f"Average Priority: {stats['average_priority']}")
+    print(f"Critical Patients (severity ≥ 8): {stats['critical_patients']}")
+    print(f"Total Resources Requested: {stats['total_resources_requested']}")
+
+def scenario_2_capacity_variation():
+    """Test Case 2: Varying Capacity"""
+    print("\n" + "="*80)
+    print("SCENARIO 2: CAPACITY VARIATION ANALYSIS")
+    print("="*80)
+    
+    client = HospitalClient()
+    client.reset()
+    
+    # Add 5 patients
+    patients_data = [
+        ("Patient A", "Critical", 10, 100, 8, 2, "Doctors"),
+        ("Patient B", "Urgent", 8, 85, 6, 5, "Doctors"),
+        ("Patient C", "High", 9, 90, 5, 15, "Beds"),
+        ("Patient D", "Medium", 7, 70, 4, 45, "Medicines"),
+        ("Patient E", "Low", 6, 50, 3, 60, "General")
+    ]
+    
+    print("\nAdding 5 patients...")
+    for name, condition, severity, priority, resources, waiting, rtype in patients_data:
+        client.add_patient(name, condition, severity, priority, resources, waiting, rtype)
+    
+    # Test different capacities
+    capacities = [10, 15, 20, 26]
+    print("\n🔄 TESTING DIFFERENT CAPACITY LEVELS:\n")
+    
+    for capacity in capacities:
+        result = client.allocate_resources(capacity)
+        print(f"Capacity: {capacity} units")
+        print(f"  Used: {result['total_resources_used']}/{capacity}")
+        print(f"  Efficiency: {result['allocation_efficiency']}%")
+        print(f"  Allocated: {len(result['allocated_patients'])} patients")
+        print(f"  Waitlisted: {len(result['waitlisted_patients'])} patients")
+        print()
+
+def scenario_3_dynamic_updates():
+    """Test Case 3: Dynamic Patient Updates"""
+    print("\n" + "="*80)
+    print("SCENARIO 3: DYNAMIC UPDATES")
+    print("="*80)
+    
+    client = HospitalClient()
+    client.reset()
+    
+    # Add patient
+    print("\nAdding initial patient...")
+    result1 = client.add_patient("John Doe", "Condition A", 7, 60, 3, 10, "Beds")
+    patient_id = result1['patient']['id']
+    print(f"Patient added with ID: {patient_id}")
+    
+    result2 = client.add_patient("Jane Smith", "Condition B", 8, 75, 4, 5, "Doctors")
+    
+    schedule1 = client.get_schedule()
+    print("\n📋 Initial Schedule:")
+    for p in schedule1['schedule']:
+        print(f"  {p['treatment_order']}. {p['name']} (Score: {p['priority_score']})")
+    
+    # Update waiting time
+    print(f"\n⏳ Updating waiting time for Patient {patient_id} from 10 to 30 minutes...")
+    requests.put(f"{BASE_URL}/api/patients/{patient_id}", 
+                json={"waiting_time": 30})
+    
+    schedule2 = client.get_schedule()
+    print("\n📋 Updated Schedule:")
+    for p in schedule2['schedule']:
+        print(f"  {p['treatment_order']}. {p['name']} (Score: {p['priority_score']})")
+
+def scenario_4_batch_processing():
+    """Test Case 4: Batch of Patients"""
+    print("\n" + "="*80)
+    print("SCENARIO 4: BATCH PROCESSING (15 Patients)")
+    print("="*80)
+    
+    client = HospitalClient()
+    client.reset()
+    
+    # Generate diverse patients
+    import random
+    names = ["Amit", "Bhavna", "Chetan", "Diya", "Eshan", "Fatima", 
+             "Gaurav", "Hema", "Iqbal", "Jaya", "Karan", "Leela", 
+             "Mohan", "Neha", "Omkar"]
+    
+    conditions = ["Heart Attack", "Accident", "Pregnancy", "Dialysis", "Fracture",
+                 "Infection", "Asthma", "Stroke", "Poisoning", "Surgery"]
+    
+    print("\nGenerating 15 patients...")
+    for i, name in enumerate(names):
+        severity = random.randint(5, 10)
+        priority = random.randint(40, 100)
+        resources = random.randint(2, 8)
+        waiting = random.randint(1, 60)
+        condition = random.choice(conditions)
+        
+        client.add_patient(name, condition, severity, priority, resources, waiting)
+    
+    # Get statistics
+    stats = client.get_statistics()
+    print("\n📊 STATISTICS:")
+    print(f"Total Patients: {stats['total_patients']}")
+    print(f"Average Severity: {stats['average_severity']:.2f}")
+    print(f"Average Priority: {stats['average_priority']:.2f}")
+    print(f"Critical Patients: {stats['critical_patients']}")
+    print(f"Total Resources Needed: {stats['total_resources_requested']}")
+    
+    # Allocate with different capacities
+    print("\n💼 ALLOCATION WITH 30 UNITS:")
+    allocation = client.allocate_resources(30)
+    print(f"Allocated: {len(allocation['allocated_patients'])} patients")
+    print(f"Waitlisted: {len(allocation['waitlisted_patients'])} patients")
+    print(f"Efficiency: {allocation['allocation_efficiency']}%")
+
+def scenario_5_recommendations():
+    """Test Case 5: Treatment Recommendations"""
+    print("\n" + "="*80)
+    print("SCENARIO 5: TREATMENT RECOMMENDATIONS")
+    print("="*80)
+    
+    client = HospitalClient()
+    client.reset()
+    
+    # Add mixed severity patients
+    patients_data = [
+        ("Critical Patient", "Life-threatening", 10, 100, 7, 1, "ICU"),
+        ("Urgent Patient", "Urgent", 9, 95, 6, 3, "ER"),
+        ("High Patient", "High priority", 8, 80, 5, 10, "Ward"),
+        ("Medium Patient", "Medium priority", 6, 60, 3, 20, "Clinic"),
+        ("Low Patient", "Low priority", 5, 40, 2, 30, "Outpatient")
+    ]
+    
+    for name, condition, severity, priority, resources, waiting, rtype in patients_data:
+        client.add_patient(name, condition, severity, priority, resources, waiting, rtype)
+    
+    # Get recommendations
+    print("\n💡 RECOMMENDATIONS WITH 15 UNITS CAPACITY:\n")
+    recommendations = client.get_recommendations(15)
+    
+    for rec in recommendations['recommendations']:
+        print(f"{rec['treatment_order']}. {rec['patient_name']}")
+        print(f"   Condition: {rec['condition']}")
+        print(f"   Severity: {rec['severity']}/10 | Score: {rec['priority_score']:.2f}")
+        print(f"   Action: {rec['action']}")
+        if 'resources_allocated' in rec:
+            print(f"   Resources: {rec['resources_allocated']} units")
+        else:
+            print(f"   Resources Needed: {rec['resources_requested']} units")
+        print()
+
+# ========== MAIN EXECUTION ==========
+
+if __name__ == "__main__":
+    try:
+        print("\n🏥 Hospital Resource Allocation System - Python Client")
+        print("Make sure backend is running: python hospital_backend.py\n")
+        
+        # Run all scenarios
+        scenario_1_four_emergency_cases()
+        scenario_2_capacity_variation()
+        scenario_3_dynamic_updates()
+        scenario_4_batch_processing()
+        scenario_5_recommendations()
+        
+        print("\n" + "="*80)
+        print("✅ ALL TESTS COMPLETED")
+        print("="*80 + "\n")
+        
+    except requests.exceptions.ConnectionError:
+        print("❌ Error: Cannot connect to backend. Make sure it's running on localhost:5000")
+        print("Run: python hospital_backend.py")
+    except Exception as e:
+        print(f"❌ Error: {e}")
