@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospital Resource Allocation System</title>
+
+<!-- ========== CSS STYLING ========== -->
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f4f9ff;
+    margin: 0;
+    padding: 0;
+  }
+
+  header {
+    background: linear-gradient(90deg, #005b96, #007acc);
+    color: white;
+    padding: 25px;
+    text-align: center;
+  }
+
+  header h1 {
+    margin: 0;
+  }
+
+  main {
+    max-width: 950px;
+    margin: 30px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  }
+
+  h2 {
+    color: #005b96;
+    text-align: center;
+  }
+
+  .section {
+    margin-top: 25px;
+  }
+
+  .input-section {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .input-section input, .input-section select {
+    flex: 1;
+    margin: 5px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+
+  button {
+    background-color: #005b96;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+
+  button:hover {
+    background-color: #014f7f;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+
+  th, td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    text-align: center;
+  }
+
+  th {
+    background-color: #005b96;
+    color: white;
+  }
+
+  .result {
+    background-color: #e8f6ff;
+    border-left: 5px solid #005b96;
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 6px;
+  }
+
+  .subheading {
+    color: #007acc;
+    margin-bottom: 10px;
+  }
+
+  .footer {
+    text-align: center;
+    padding: 15px;
+    color: #555;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ========== HEADER ========== -->
+<header>
+  <h1>🏥 Hospital Resource Allocation System</h1>
+  <p>Optimizing hospital resources using Knapsack and Priority Scheduling</p>
+</header>
+
+<main>
+
+  <!-- ========== PATIENT INPUT SECTION ========== -->
+  <section class="section">
+    <h2>🧾 Patient Data Entry</h2>
+    <div class="input-section">
+      <input type="text" id="pname" placeholder="Patient Name">
+      <input type="number" id="priority" placeholder="Priority (1–100)">
+      <input type="number" id="resource" placeholder="Resources Needed">
+      <input type="number" id="waiting" placeholder="Waiting Time (minutes)">
+      <input type="number" id="severity" placeholder="Severity (1–10)">
+      <select id="rtype">
+        <option value="Beds">Beds</option>
+        <option value="Doctors">Doctors</option>
+        <option value="Medicines">Medicines</option>
+      </select>
+    </div>
+    <button onclick="addPatient()">Add Patient</button>
+
+    <table id="patientTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Priority</th>
+          <th>Resources</th>
+          <th>Type</th>
+          <th>Waiting Time</th>
+          <th>Severity</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- ========== KNAPSACK SECTION ========== -->
+  <section class="section">
+    <h2>🎯 Resource Optimization (Knapsack)</h2>
+    <div class="input-section">
+      <input type="number" id="capacity" placeholder="Total Available Resources">
+    </div>
+    <button onclick="allocateResources()">Optimize Allocation</button>
+
+    <div id="knapsackResult" class="result" style="display:none;"></div>
+  </section>
+
+  <!-- ========== PRIORITY SCHEDULING SECTION ========== -->
+  <section class="section">
+    <h2>⏱ Treatment Order (Priority Scheduling)</h2>
+    <p style="text-align:center;">Scheduling patients based on severity, priority, and waiting time.</p>
+    <button onclick="schedulePatients()">Generate Schedule</button>
+    <div id="scheduleResult" class="result" style="display:none;"></div>
+  </section>
+
+</main>
+
+<div class="footer">
+  © 2025 Hospital Resource Allocation System | Powered by Knapsack + Priority Scheduling
+</div>
+
+<!-- ========== JAVASCRIPT LOGIC ========== -->
+<script>
+  const patients = [];
+
+  function addPatient() {
+    const name = document.getElementById('pname').value;
+    const priority = parseInt(document.getElementById('priority').value);
+    const resource = parseInt(document.getElementById('resource').value);
+    const waiting = parseInt(document.getElementById('waiting').value);
+    const severity = parseInt(document.getElementById('severity').value);
+    const rtype = document.getElementById('rtype').value;
+
+    if (!name || !priority || !resource || !waiting || !severity) {
+      alert('Please fill in all fields!');
+      return;
+    }
+
+    patients.push({ name, priority, resource, waiting, severity, rtype });
+
+    const row = `<tr>
+      <td>${name}</td>
+      <td>${priority}</td>
+      <td>${resource}</td>
+      <td>${rtype}</td>
+      <td>${waiting}</td>
+      <td>${severity}</td>
+    </tr>`;
+    document.querySelector('#patientTable tbody').insertAdjacentHTML('beforeend', row);
+
+    document.querySelectorAll('.input-section input').forEach(i => i.value = '');
+  }
+
+  // ========== 0/1 Knapsack Algorithm ==========
+  function allocateResources() {
+    const capacity = parseInt(document.getElementById('capacity').value);
+    if (!capacity || patients.length === 0) {
+      alert('Please enter capacity and add patients!');
+      return;
+    }
+
+    const n = patients.length;
+    const dp = Array.from({ length: n + 1 }, () => Array(capacity + 1).fill(0));
+
+    for (let i = 1; i <= n; i++) {
+      for (let w = 1; w <= capacity; w++) {
+        if (patients[i - 1].resource <= w) {
+          dp[i][w] = Math.max(
+            patients[i - 1].priority + dp[i - 1][w - patients[i - 1].resource],
+            dp[i - 1][w]
+          );
+        } else {
+          dp[i][w] = dp[i - 1][w];
+        }
+      }
+    }
+
+    let w = capacity;
+    const selected = [];
+    for (let i = n; i > 0 && w > 0; i--) {
+      if (dp[i][w] !== dp[i - 1][w]) {
+        selected.push(patients[i - 1]);
+        w -= patients[i - 1].resource;
+      }
+    }
+
+    let resultHTML = `<h3>Optimal Allocation Result</h3>
+      <p><strong>Total Available Resources:</strong> ${capacity}</p>
+      <p><strong>Maximum Priority Achieved:</strong> ${dp[n][capacity]}</p>
+      <h4>Allocated Patients:</h4>
+      <ul>`;
+
+    selected.reverse().forEach(p => {
+      resultHTML += <li>${p.name} (Priority: ${p.priority}, Resources: ${p.resource}, Type: ${p.rtype})</li>;
+    });
+    resultHTML += </ul>;
+
+    const resultDiv = document.getElementById('knapsackResult');
+    resultDiv.innerHTML = resultHTML;
+    resultDiv.style.display = 'block';
+  }
+
+  // ========== Priority Scheduling ==========
+  function schedulePatients() {
+    if (patients.length === 0) {
+      alert('Please add patients first!');
+      return;
+    }
+
+    // Composite score = severity * 2 + priority + (waiting / 10)
+    const scheduled = [...patients].sort((a, b) =>
+      (b.severity * 2 + b.priority + b.waiting / 10) -
+      (a.severity * 2 + a.priority + a.waiting / 10)
+    );
+
+    let html = `<h3>Patient Treatment Schedule</h3>
+      <table>
+        <tr><th>Order</th><th>Patient</th><th>Severity</th><th>Priority</th><th>Waiting Time (min)</th></tr>`;
+
+    scheduled.forEach((p, i) => {
+      html += `<tr>
+        <td>${i + 1}</td>
+        <td>${p.name}</td>
+        <td>${p.severity}</td>
+        <td>${p.priority}</td>
+        <td>${p.waiting}</td>
+      </tr>`;
+    });
+
+    html += </table>;
+    const resultDiv = document.getElementById('scheduleResult');
+    resultDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
+  }
+</script>
+</body>
+</html>
